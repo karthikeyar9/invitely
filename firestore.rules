@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /events/{eventId} {
+      allow read, create: if true;
+      allow update, delete: if false;
+      match /rsvps/{rsvpId} {
+        allow read: if true;
+        allow create: if request.resource.data.name is string
+                      && request.resource.data.name.size() > 0
+                      && request.resource.data.name.size() <= 60
+                      && request.resource.data.going is bool
+                      && (!("count" in request.resource.data)
+                          || (request.resource.data.count is int
+                              && request.resource.data.count >= 0
+                              && request.resource.data.count <= 20));
+        allow update, delete: if false;
+      }
+    }
+  }
+}

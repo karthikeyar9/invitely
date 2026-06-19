@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Invitely — Beautiful invitations, shared as a link</title>
+<meta name="description" content="Create a beautiful invitation and share it with friends as a simple link. No signup, no app.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,500&family=Inter:wght@400;500;600;700&family=Great+Vibes&display=swap" rel="stylesheet">
+<!-- Firebase compat SDK — loaded as regular scripts so they always work -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+  :root {
+    --ink: #1f1b16;
+    --muted: #6f675d;
+    --paper: #faf6ef;
+    --line: #e7e0d4;
+    --accent: #c2410c;
+    --radius: 18px;
+    font-size: 16px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: "Inter", system-ui, sans-serif;
+    color: var(--ink);
+    background: var(--paper);
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, .serif { font-family: "Fraunces", Georgia, serif; }
+  button { font: inherit; cursor: pointer; }
+  input, select, textarea {
+    font: inherit; color: inherit; width: 100%;
+    padding: 10px 12px; border: 1.5px solid var(--line);
+    border-radius: 10px; background: #fff; outline: none;
+    transition: border-color .15s;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 72px; }
+  label { display: block; font-size: .8rem; font-weight: 600; letter-spacing: .02em; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; }
+  .field { margin-bottom: 16px; }
+  .row { display: flex; gap: 12px; }
+  .row > .field { flex: 1; }
+
+  /* ---------- Builder layout ---------- */
+  .builder {
+    max-width: 1180px; margin: 0 auto; padding: 32px 24px 80px;
+  }
+  .masthead { text-align: center; padding: 28px 0 36px; }
+  .masthead .logo { font-size: 1.05rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+  .masthead h1 { font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 600; margin-top: 10px; }
+  .masthead p { color: var(--muted); margin-top: 10px; font-size: 1.05rem; }
+  .builder-grid {
+    display: grid; grid-template-columns: 420px 1fr; gap: 36px; align-items: start;
+  }
+  @media (max-width: 920px) { .builder-grid { grid-template-columns: 1fr; } }
+  .panel {
+    background: #fff; border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 26px; box-shadow: 0 8px 30px rgba(31, 27, 22, .05);
+  }
+  .panel h2 { font-size: 1.3rem; margin-bottom: 18px; }
+
+  .themes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .theme-chip {
+    border: 2px solid var(--line); border-radius: 12px; padding: 10px 6px 8px;
+    background: #fff; text-align: center; font-size: .75rem; font-weight: 600; color: var(--muted);
+    transition: border-color .15s, transform .15s;
+  }
+  .theme-chip:hover { transform: translateY(-1px); }
+  .theme-chip.active { border-color: var(--accent); color: var(--ink); }
+  .theme-chip .swatch { height: 34px; border-radius: 8px; margin-bottom: 6px; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    border: none; border-radius: 999px; padding: 13px 24px;
+    font-weight: 600; font-size: .95rem; text-decoration: none;
+    transition: transform .12s, box-shadow .12s, opacity .12s;
+  }
+  .btn:hover { transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
+  .btn-primary { background: var(--ink); color: #fff; box-shadow: 0 6px 18px rgba(31,27,22,.25); width: 100%; }
+  .btn-ghost { background: transparent; color: inherit; border: 1.5px solid currentColor; }
+
+  .share-box {
+    margin-top: 18px; padding: 16px; border-radius: 12px;
+    background: var(--paper); border: 1px dashed var(--line); display: none;
+  }
+  .share-box.visible { display: block; }
+  .share-box .url {
+    font-size: .8rem; word-break: break-all; color: var(--muted);
+    background: #fff; border: 1px solid var(--line); border-radius: 8px;
+    padding: 10px; max-height: 76px; overflow: auto; margin-bottom: 10px;
+  }
+  .share-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .share-actions .btn { padding: 9px 16px; font-size: .85rem; }
+  .copied-note { font-size: .8rem; color: #15803d; font-weight: 600; margin-top: 8px; display: none; }
+
+  .preview-label { font-size: .8rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); text-align: center; margin-bottom: 14px; }
+
+  /* ---------- Invitation card ---------- */
+  .invite-stage { min-height: 100%; display: flex; align-items: center; justify-content: center; padding: 40px 18px 70px; }
+  body.view-mode { background: var(--card-bg-page, var(--paper)); }
+
+  .card {
+    position: relative; width: 100%; max-width: 560px;
+    border-radius: 26px; padding: clamp(34px, 6vw, 60px) clamp(26px, 5vw, 54px);
+    text-align: center; overflow: hidden;
+    background: var(--card-bg, #fff); color: var(--card-ink, var(--ink));
+    box-shadow: 0 30px 80px rgba(31, 27, 22, .18);
+    border: 1px solid rgba(0,0,0,.04);
+  }
+  .card .deco { position: absolute; font-size: 1.6rem; opacity: .85; user-select: none; pointer-events: none; }
+  .card .kicker {
+    font-size: .78rem; font-weight: 700; letter-spacing: .22em; text-transform: uppercase;
+    color: var(--card-accent, var(--accent)); margin-bottom: 18px;
+  }
+  .card .emoji { font-size: 3rem; line-height: 1; margin-bottom: 14px; }
+  .card h2.title {
+    font-family: var(--title-font, "Fraunces", Georgia, serif);
+    font-size: clamp(1.9rem, 5vw, 2.8rem); font-weight: 600; line-height: 1.12; margin-bottom: 14px;
+  }
+  /* stationery-style double frame; transparent unless a theme sets --frame1/--frame2 */
+  .card::before {
+    content: ""; position: absolute; inset: 12px; border-radius: 16px;
+    border: 1.5px solid var(--frame1, transparent); pointer-events: none;
+  }
+  .card::after {
+    content: ""; position: absolute; inset: 18px; border-radius: 12px;
+    border: 1px solid var(--frame2, transparent); pointer-events: none;
+  }
+  .card .hosted { font-family: "Fraunces", serif; font-style: italic; font-size: 1.05rem; opacity: .85; margin-bottom: 26px; }
+  .card .divider {
+    width: 64px; height: 2px; margin: 0 auto 26px;
+    background: var(--card-accent, var(--accent)); opacity: .6; border-radius: 2px;
+  }
+  .card .when-where { display: grid; gap: 14px; margin-bottom: 26px; }
+  .card .ww-item .ww-label {
+    font-size: .72rem; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; opacity: .55; margin-bottom: 3px;
+  }
+  .card .ww-item .ww-value { font-family: "Fraunces", serif; font-size: 1.18rem; font-weight: 600; }
+  .card .ww-item .ww-sub { font-size: .92rem; opacity: .75; margin-top: 2px; }
+  .card .message {
+    font-size: .98rem; line-height: 1.65; opacity: .85; margin-bottom: 30px; white-space: pre-wrap;
+  }
+  .card .rsvp-heading { font-size: .78rem; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; opacity: .6; margin-bottom: 14px; }
+  .card .rsvp-buttons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 10px; }
+  .card .rsvp-form input {
+    max-width: 280px; margin: 0 auto 14px; display: block; text-align: center;
+    background: rgba(255,255,255,.9); border-color: rgba(0,0,0,.15); color: #1f1b16;
+  }
+  .card .rsvp-row {
+    display: flex; gap: 8px; justify-content: center; align-items: center;
+    max-width: 300px; margin: 0 auto 4px;
+  }
+  .card .rsvp-row input { margin: 0; }
+  .card .rsvp-row input[type="number"] { width: 76px; flex-shrink: 0; }
+  .card .rsvp-hint { font-size: .75rem; opacity: .6; margin-bottom: 14px; }
+  .card .rsvp-status { font-size: .92rem; font-weight: 600; margin-top: 8px; min-height: 1.2em; }
+  .card .rsvp-tally { margin-top: 20px; font-size: .95rem; }
+  .card .rsvp-lists { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .card .rsvp-list-block { border-radius: 10px; padding: 10px 14px; text-align: left; background: rgba(0,0,0,.08); }
+  .card .rsvp-list-label { font-size: .7rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; opacity: .6; margin-bottom: 4px; }
+  .card .rsvp-names { font-size: .88rem; line-height: 1.55; font-weight: 500; }
+  .card .btn-yes { background: var(--card-accent, var(--accent)); color: var(--card-accent-ink, #fff); box-shadow: 0 8px 22px rgba(0,0,0,.18); }
+  .card .btn-no { background: transparent; color: inherit; border: 1.5px solid currentColor; opacity: .75; }
+  .card .extras { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; margin-top: 22px; }
+  .card .extras a {
+    font-size: .85rem; font-weight: 600; color: inherit; opacity: .7; text-decoration: none; border-bottom: 1px solid currentColor;
+  }
+  .card .extras a:hover { opacity: 1; }
+
+  .made-with { text-align: center; margin-top: 26px; font-size: .82rem; color: var(--muted); }
+  .made-with a { color: inherit; font-weight: 600; }
+
+  /* ---------- Themes ---------- */
+  .theme-confetti  { --card-bg: linear-gradient(160deg, #fff7ed 0%, #ffe4e6 100%); --card-ink: #431407; --card-accent: #e11d48; --card-accent-ink: #fff; --card-bg-page: #fdf2f0; }
+  .theme-midnight  { --card-bg: linear-gradient(165deg, #111827 0%, #1e1b4b 100%); --card-ink: #f5f3ee; --card-accent: #eab308; --card-accent-ink: #1c1917; --card-bg-page: #0b0e1a; }
+  .theme-garden    { --card-bg: linear-gradient(160deg, #f7fee7 0%, #d9f2dd 100%); --card-ink: #1a2e05; --card-accent: #3f6212; --card-accent-ink: #fff; --card-bg-page: #eef5e6; }
+  .theme-ocean     { --card-bg: linear-gradient(165deg, #eff6ff 0%, #cffafe 100%); --card-ink: #172554; --card-accent: #0e7490; --card-accent-ink: #fff; --card-bg-page: #e8f3f8; }
+  .theme-sunset    { --card-bg: linear-gradient(160deg, #fff7ed 0%, #fed7aa 60%, #fecdd3 100%); --card-ink: #431407; --card-accent: #c2410c; --card-accent-ink: #fff; --card-bg-page: #fdf0e4; }
+  .theme-minimal   { --card-bg: #ffffff; --card-ink: #18181b; --card-accent: #18181b; --card-accent-ink: #fff; --card-bg-page: #f4f4f2; }
+
+  .theme-floral {
+    --card-bg: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='150' height='150'><g opacity='.55'><g fill='%23e8b4c0'><circle cx='28' cy='24' r='4'/><circle cx='36' cy='28' r='4'/><circle cx='28' cy='34' r='4'/><circle cx='20' cy='28' r='4'/><circle cx='28' cy='29' r='2.5' fill='%23c9952c'/></g><g fill='%23b9cfa4'><ellipse cx='105' cy='75' rx='9' ry='3' transform='rotate(40 105 75)'/><ellipse cx='116' cy='86' rx='9' ry='3' transform='rotate(-30 116 86)'/></g><g fill='%23dba8b8'><circle cx='70' cy='118' r='3.5'/><circle cx='77' cy='121' r='3.5'/><circle cx='70' cy='126' r='3.5'/><circle cx='63' cy='121' r='3.5'/><circle cx='70' cy='122' r='2' fill='%23c9952c'/></g></g></svg>") repeat, linear-gradient(#fffdf7, #fdf5ea);
+    --card-ink: #5f4a38; --card-accent: #b08d4f; --card-accent-ink: #fff; --card-bg-page: #f3ecdd;
+    --frame1: rgba(176,141,79,.5); --frame2: rgba(176,141,79,.25);
+    --title-font: "Great Vibes", cursive;
+  }
+  .theme-blush {
+    --card-bg: linear-gradient(170deg, #fff8f6 0%, #fbe3e7 100%);
+    --card-ink: #6d3a44; --card-accent: #b76e79; --card-accent-ink: #fff; --card-bg-page: #f7e7e9;
+    --frame1: rgba(183,110,121,.45); --frame2: rgba(183,110,121,.22);
+    --title-font: "Great Vibes", cursive;
+  }
+  .theme-gatsby {
+    --card-bg: linear-gradient(160deg, #191512 0%, #2c2317 100%);
+    --card-ink: #f3e9d2; --card-accent: #d4af37; --card-accent-ink: #1c1917; --card-bg-page: #141110;
+    --frame1: rgba(212,175,55,.6); --frame2: rgba(212,175,55,.25);
+  }
+  .theme-sage {
+    --card-bg: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='130' height='130'><g fill='%237ca982' opacity='.35'><ellipse cx='25' cy='25' rx='10' ry='3.5' transform='rotate(45 25 25)'/><ellipse cx='95' cy='60' rx='10' ry='3.5' transform='rotate(-35 95 60)'/><ellipse cx='45' cy='105' rx='10' ry='3.5' transform='rotate(20 45 105)'/></g></svg>") repeat, linear-gradient(160deg, #f6faf3, #e6f0df);
+    --card-ink: #2f3e2c; --card-accent: #5f7a4f; --card-accent-ink: #fff; --card-bg-page: #eef2e8;
+  }
+  .theme-fiesta {
+    --card-bg: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='90' height='90'><circle cx='15' cy='18' r='5' fill='%23f59e0b' opacity='.5'/><circle cx='60' cy='32' r='4' fill='%23ec4899' opacity='.45'/><circle cx='34' cy='64' r='6' fill='%238b5cf6' opacity='.35'/><circle cx='76' cy='72' r='4' fill='%230ea5e9' opacity='.5'/></svg>") repeat, linear-gradient(#fffbf2, #fff7f9);
+    --card-ink: #4a2c12; --card-accent: #db2777; --card-accent-ink: #fff; --card-bg-page: #fdf4e7;
+  }
+  .theme-picnic {
+    --card-bg: repeating-linear-gradient(0deg, rgba(190,40,55,.10) 0 12px, transparent 12px 24px),
+               repeating-linear-gradient(90deg, rgba(190,40,55,.10) 0 12px, transparent 12px 24px), #fffdf6;
+    --card-ink: #5a2430; --card-accent: #be2837; --card-accent-ink: #fff; --card-bg-page: #f7ece2;
+  }
+  .theme-floral h2.title, .theme-blush h2.title {
+    font-size: clamp(2.6rem, 7vw, 3.8rem); font-weight: 400; line-height: 1.05;
+  }
+
+  /* custom uploaded background photo */
+  .card.has-photo {
+    color: #fff; --card-ink: #fff; --card-accent: #ffffff; --card-accent-ink: #23201c;
+    --frame1: rgba(255,255,255,.5); --frame2: transparent;
+    text-shadow: 0 1px 10px rgba(0,0,0,.45);
+  }
+  .card.has-photo .deco { display: none; }
+  .card.has-photo .divider { background: #fff; }
+  .card.has-photo .btn, .card.has-photo .rsvp-form input { text-shadow: none; }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<!-- =============== BUILDER =============== -->
+<div id="builder" class="builder">
+  <header class="masthead">
+    <div class="logo">✉️ Invitely</div>
+    <h1>Make an invitation.<br>Share it as a link.</h1>
+    <p>No signup, no app — fill this in, copy your link, and text it to friends.</p>
+  </header>
+
+  <div class="builder-grid">
+    <div class="panel">
+      <h2>Event details</h2>
+
+      <div class="field">
+        <label for="f-title">Event title</label>
+        <input id="f-title" type="text" placeholder="John's 30th Birthday Bash" maxlength="80">
+      </div>
+
+      <div class="field">
+        <label for="f-host">Hosted by</label>
+        <input id="f-host" type="text" placeholder="John &amp; Jane Doe" maxlength="60">
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="f-date">Date</label>
+          <input id="f-date" type="date">
+        </div>
+        <div class="field">
+          <label for="f-time">Start time</label>
+          <input id="f-time" type="time">
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="f-location">Location</label>
+        <input id="f-location" type="text" placeholder="123 Maple Street, Cary, NC" maxlength="120">
+      </div>
+
+      <div class="field">
+        <label for="f-message">Message <span style="text-transform:none;font-weight:400">(optional)</span></label>
+        <textarea id="f-message" placeholder="Join us for dinner, drinks, and cake! Dress code: festive." maxlength="400"></textarea>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="f-emoji">Emoji</label>
+          <input id="f-emoji" type="text" placeholder="🎉" maxlength="8">
+        </div>
+        <div class="field" style="flex:2">
+          <label for="f-contact">RSVP to <span style="text-transform:none;font-weight:400">(your email or phone)</span></label>
+          <input id="f-contact" type="text" placeholder="you@email.com or 919-555-0100" maxlength="80">
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="f-photo">Background photo <span style="text-transform:none;font-weight:400">(optional — your own design or photo)</span></label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="f-photo" type="file" accept="image/*" style="padding:8px">
+          <button id="btn-clear-photo" class="btn btn-ghost hidden" style="padding:8px 14px;font-size:.8rem;flex-shrink:0">Remove</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Theme</label>
+        <div class="themes" id="theme-picker">
+          <button class="theme-chip active" data-theme="confetti"><div class="swatch" style="background:linear-gradient(160deg,#fff7ed,#ffe4e6)"></div>Confetti</button>
+          <button class="theme-chip" data-theme="midnight"><div class="swatch" style="background:linear-gradient(165deg,#111827,#1e1b4b)"></div>Midnight</button>
+          <button class="theme-chip" data-theme="garden"><div class="swatch" style="background:linear-gradient(160deg,#f7fee7,#d9f2dd)"></div>Garden</button>
+          <button class="theme-chip" data-theme="ocean"><div class="swatch" style="background:linear-gradient(165deg,#eff6ff,#cffafe)"></div>Ocean</button>
+          <button class="theme-chip" data-theme="sunset"><div class="swatch" style="background:linear-gradient(160deg,#fff7ed,#fed7aa,#fecdd3)"></div>Sunset</button>
+          <button class="theme-chip" data-theme="minimal"><div class="swatch" style="background:#fff;border:1px solid #e4e4e7"></div>Minimal</button>
+          <button class="theme-chip" data-theme="floral"><div class="swatch" style="background:linear-gradient(160deg,#fffdf7,#f5e3da);box-shadow:inset 0 0 0 2px rgba(176,141,79,.4)"></div>Floral</button>
+          <button class="theme-chip" data-theme="blush"><div class="swatch" style="background:linear-gradient(170deg,#fff8f6,#fbe3e7);box-shadow:inset 0 0 0 2px rgba(183,110,121,.35)"></div>Blush</button>
+          <button class="theme-chip" data-theme="gatsby"><div class="swatch" style="background:linear-gradient(160deg,#191512,#2c2317);box-shadow:inset 0 0 0 2px rgba(212,175,55,.55)"></div>Gatsby</button>
+          <button class="theme-chip" data-theme="sage"><div class="swatch" style="background:linear-gradient(160deg,#f6faf3,#dbe8d2)"></div>Sage</button>
+          <button class="theme-chip" data-theme="fiesta"><div class="swatch" style="background:linear-gradient(120deg,#fde68a,#fbcfe8,#bae6fd)"></div>Fiesta</button>
+          <button class="theme-chip" data-theme="picnic"><div class="swatch" style="background:repeating-linear-gradient(0deg,rgba(190,40,55,.18) 0 6px,transparent 6px 12px),repeating-linear-gradient(90deg,rgba(190,40,55,.18) 0 6px,transparent 6px 12px),#fffdf6"></div>Picnic</button>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="btn-generate">Create my invitation link</button>
+
+      <div class="share-box" id="share-box">
+        <div class="url" id="share-url"></div>
+        <div class="share-actions">
+          <button class="btn btn-primary" id="btn-copy" style="width:auto">Copy link</button>
+          <a class="btn btn-ghost" id="btn-open" target="_blank" rel="noopener">Preview</a>
+          <a class="btn btn-ghost" id="btn-text">Share via text</a>
+        </div>
+        <div class="copied-note" id="copied-note">Copied! Paste it anywhere — text, WhatsApp, email.</div>
+        <div id="long-warn" style="display:none;font-size:.8rem;color:#b45309;font-weight:600;margin-top:8px">Heads up: photo invitations make very long links that may not work in texts. Enable Firebase (see README) to get short links with photos.</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="preview-label">Live preview</div>
+      <div id="preview-slot"></div>
+    </div>
+  </div>
+</div>
+
+<!-- =============== INVITE VIEW =============== -->
+<div id="invite-view" class="invite-stage hidden">
+  <div style="width:100%; max-width:560px;">
+    <div id="invite-slot"></div>
+    <div class="made-with">Made with <a href="#" id="make-your-own">Invitely — create your own invitation</a></div>
+  </div>
+</div>
+
+<script src="firebase-config.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var fb = null; // set by initFirebase() when firebase-config.js has a config
+
+  var THEME_DECOS = {
+    confetti: ["🎉","🎈","✨","🎊"],
+    midnight: ["✨","🌙","⭐","✨"],
+    garden:   ["🌿","🌸","🍃","🌷"],
+    ocean:    ["🌊","🐚","⛵","✨"],
+    sunset:   ["🌅","🍹","✨","🌴"],
+    minimal:  [],
+    floral:   ["✿","❀","✿","❀"],
+    blush:    ["❀","✧","❀","✧"],
+    gatsby:   ["✦","✧","✦","✧"],
+    sage:     ["🌿","🍃","🌿","🍃"],
+    fiesta:   ["🎈","🎉","🪅","🎊"],
+    picnic:   ["🍉","🌻","🧺","🐝"]
+  };
+  var DECO_POS = [
+    "top:18px;left:22px", "top:26px;right:26px",
+    "bottom:24px;left:28px", "bottom:18px;right:22px"
+  ];
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  function encodeData(obj) {
+    var json = JSON.stringify(obj);
+    return btoa(unescape(encodeURIComponent(json)))
+      .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function decodeData(str) {
+    try {
+      var b64 = str.replace(/-/g, "+").replace(/_/g, "/");
+      while (b64.length % 4) b64 += "=";
+      return JSON.parse(decodeURIComponent(escape(atob(b64))));
+    } catch (e) { return null; }
+  }
+
+  function formatDate(iso) {
+    if (!iso) return "";
+    var p = iso.split("-");
+    var d = new Date(+p[0], +p[1] - 1, +p[2]);
+    return d.toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+  }
+  function formatTime(t) {
+    if (!t) return "";
+    var p = t.split(":"), h = +p[0], m = p[1];
+    var ap = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    return h + ":" + m + " " + ap;
+  }
+
+  function calendarDates(d) {
+    if (!d.date) return null;
+    var dt = d.date.replace(/-/g, "");
+    var st = (d.time || "18:00").replace(":", "") + "00";
+    var endH = (+((d.time || "18:00").split(":")[0]) + 3) % 24;
+    var et = String(endH).padStart(2, "0") + (d.time || "18:00").split(":")[1] + "00";
+    return dt + "T" + st + "/" + dt + "T" + et;
+  }
+
+  function rsvpLinks(d) {
+    var contact = (d.contact || "").trim();
+    if (!contact) return null;
+    var title = d.title || "your event";
+    if (contact.indexOf("@") !== -1) {
+      var base = "mailto:" + encodeURIComponent(contact) + "?subject=" + encodeURIComponent("RSVP: " + title);
+      return {
+        yes: base + "&body=" + encodeURIComponent("Yes! I'll be there. 🎉\nNumber of people (including me): \n\n— "),
+        no:  base + "&body=" + encodeURIComponent("So sorry, I can't make it. 💛\n\n— ")
+      };
+    }
+    var phone = contact.replace(/[^+\d]/g, "");
+    return {
+      yes: "sms:" + phone + "?&body=" + encodeURIComponent("Yes! I'll be there for " + title + " 🎉"),
+      no:  "sms:" + phone + "?&body=" + encodeURIComponent("So sorry, I can't make it to " + title + " 💛")
+    };
+  }
+
+  function renderCard(d, liveRsvp) {
+    var theme = THEME_DECOS.hasOwnProperty(d.theme) ? d.theme : "confetti";
+    var decos = THEME_DECOS[theme].map(function (e, i) {
+      return '<span class="deco" style="' + DECO_POS[i] + '">' + e + "</span>";
+    }).join("");
+
+    var when = formatDate(d.date);
+    var time = formatTime(d.time);
+    var rsvp = rsvpLinks(d);
+    var cal = calendarDates(d);
+
+    var photo = (d.bg && /^data:image\//.test(d.bg)) ? d.bg : null;
+    var cardStyle = photo
+      ? ' style="background-image:linear-gradient(rgba(22,18,14,.45),rgba(22,18,14,.6)),url(' + photo + ');background-size:cover;background-position:center"'
+      : "";
+    var html = '<div class="card theme-' + theme + (photo ? " has-photo" : "") + '"' + cardStyle + ">" + decos;
+    html += '<div class="kicker">You\'re invited</div>';
+    if (d.emoji) html += '<div class="emoji">' + esc(d.emoji) + "</div>";
+    html += '<h2 class="title">' + (esc(d.title) || "Your Event Title") + "</h2>";
+    if (d.host) html += '<div class="hosted">hosted by ' + esc(d.host) + "</div>";
+    html += '<div class="divider"></div>';
+
+    html += '<div class="when-where">';
+    if (when) {
+      html += '<div class="ww-item"><div class="ww-label">When</div><div class="ww-value">' + esc(when) + "</div>";
+      if (time) html += '<div class="ww-sub">starting at ' + esc(time) + "</div>";
+      html += "</div>";
+    }
+    if (d.location) {
+      html += '<div class="ww-item"><div class="ww-label">Where</div><div class="ww-value">' + esc(d.location) + "</div></div>";
+    }
+    html += "</div>";
+
+    if (d.message) html += '<div class="message">' + esc(d.message) + "</div>";
+
+    if (liveRsvp) {
+      html += '<div class="rsvp-heading">Kindly RSVP</div>';
+      html += '<div class="rsvp-form"><div class="rsvp-row">';
+      html += '<input id="rsvp-name" type="text" maxlength="60" placeholder="Your name" autocomplete="name">';
+      html += '<input id="rsvp-count" type="number" min="1" max="20" value="1" aria-label="Number of people attending">';
+      html += '</div><div class="rsvp-hint">number of people, including you</div>';
+      html += '<div class="rsvp-buttons">';
+      html += '<button class="btn btn-yes" id="rsvp-yes">🎉 Count me in</button>';
+      html += '<button class="btn btn-no" id="rsvp-no">Can\'t make it</button>';
+      html += '</div><div class="rsvp-status" id="rsvp-status"></div></div>';
+      html += '<div class="rsvp-tally" id="rsvp-tally"></div>';
+    } else if (rsvp) {
+      html += '<div class="rsvp-heading">Kindly RSVP</div><div class="rsvp-buttons">';
+      html += '<a class="btn btn-yes" href="' + rsvp.yes + '">🎉 Count me in</a>';
+      html += '<a class="btn btn-no" href="' + rsvp.no + '">Can\'t make it</a>';
+      html += "</div>";
+    }
+
+    var extras = [];
+    if (cal && d.title) {
+      var gcal = "https://calendar.google.com/calendar/render?action=TEMPLATE" +
+        "&text=" + encodeURIComponent(d.title) +
+        "&dates=" + cal +
+        (d.location ? "&location=" + encodeURIComponent(d.location) : "") +
+        (d.message ? "&details=" + encodeURIComponent(d.message) : "");
+      extras.push('<a href="' + gcal + '" target="_blank" rel="noopener">Add to calendar</a>');
+    }
+    if (d.location) {
+      extras.push('<a href="https://maps.google.com/?q=' + encodeURIComponent(d.location) + '" target="_blank" rel="noopener">Open in Maps</a>');
+    }
+    if (extras.length) html += '<div class="extras">' + extras.join("") + "</div>";
+
+    html += "</div>";
+    return html;
+  }
+
+  // ---------- Firebase (compat SDK — loaded via static script tags in <head>) ----------
+  function initFirebase() {
+    if (fb) return fb;
+    if (!window.FIREBASE_CONFIG || typeof firebase === "undefined") return null;
+    try {
+      if (!firebase.apps.length) firebase.initializeApp(window.FIREBASE_CONFIG);
+      fb = firebase.firestore();
+      return fb;
+    } catch (e) {
+      console.error("Firebase init failed:", e);
+      return null;
+    }
+  }
+
+  // ---------- State & wiring ----------
+  var fields = ["title", "host", "date", "time", "location", "message", "emoji", "contact"];
+  var currentTheme = "confetti";
+  var customBg = null;
+
+  function readForm() {
+    var d = { theme: currentTheme };
+    fields.forEach(function (f) {
+      d[f] = document.getElementById("f-" + f).value.trim();
+    });
+    if (customBg) d.bg = customBg;
+    return d;
+  }
+
+  function updatePreview() {
+    document.getElementById("preview-slot").innerHTML = renderCard(readForm(), !!window.FIREBASE_CONFIG);
+    document.getElementById("share-box").classList.remove("visible");
+  }
+
+  function initBuilder() {
+    fields.forEach(function (f) {
+      document.getElementById("f-" + f).addEventListener("input", updatePreview);
+    });
+
+    document.getElementById("f-photo").addEventListener("change", function () {
+      var file = this.files && this.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function () {
+        var img = new Image();
+        img.onload = function () {
+          // resize + recompress so the image stays well under Firestore's 1MB doc limit
+          var max = 1000;
+          var scale = Math.min(1, max / Math.max(img.width, img.height));
+          var c = document.createElement("canvas");
+          c.width = Math.round(img.width * scale);
+          c.height = Math.round(img.height * scale);
+          c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+          customBg = c.toDataURL("image/jpeg", 0.72);
+          document.getElementById("btn-clear-photo").classList.remove("hidden");
+          updatePreview();
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    document.getElementById("btn-clear-photo").addEventListener("click", function () {
+      customBg = null;
+      document.getElementById("f-photo").value = "";
+      this.classList.add("hidden");
+      updatePreview();
+    });
+
+    document.getElementById("theme-picker").addEventListener("click", function (e) {
+      var chip = e.target.closest(".theme-chip");
+      if (!chip) return;
+      currentTheme = chip.dataset.theme;
+      document.querySelectorAll(".theme-chip").forEach(function (c) { c.classList.remove("active"); });
+      chip.classList.add("active");
+      updatePreview();
+    });
+
+    function showShare(url, longWarn) {
+      document.getElementById("share-url").textContent = url;
+      document.getElementById("btn-open").href = url;
+      document.getElementById("btn-text").href = "sms:?&body=" + encodeURIComponent("You're invited! 🎉 " + url);
+      document.getElementById("share-box").classList.add("visible");
+      document.getElementById("copied-note").style.display = "none";
+      document.getElementById("long-warn").style.display = longWarn ? "block" : "none";
+      document.getElementById("share-box").scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
+    document.getElementById("btn-generate").addEventListener("click", function () {
+      var d = readForm();
+      if (!d.title) { document.getElementById("f-title").focus(); document.getElementById("f-title").style.borderColor = "#dc2626"; return; }
+      var btn = document.getElementById("btn-generate");
+      var fallbackUrl = location.origin + location.pathname + "#" + encodeData(d);
+      var db = initFirebase();
+      if (!db) { showShare(fallbackUrl, !!d.bg); return; }
+      btn.disabled = true;
+      btn.textContent = "Saving…";
+      db.collection("events").add({ data: d, created: firebase.firestore.FieldValue.serverTimestamp() })
+        .then(function (ref) {
+          showShare(location.origin + location.pathname + "#e=" + ref.id);
+        })
+        .catch(function (err) {
+          console.error("Save failed; falling back to link-only invite.", err);
+          showShare(fallbackUrl);
+        })
+        .finally(function () {
+          btn.disabled = false;
+          btn.textContent = "Create my invitation link";
+        });
+    });
+
+    document.getElementById("btn-copy").addEventListener("click", function () {
+      var url = document.getElementById("share-url").textContent;
+      navigator.clipboard.writeText(url).then(function () {
+        document.getElementById("copied-note").style.display = "block";
+      });
+    });
+
+    updatePreview();
+  }
+
+  function showInvite(d, eventId) {
+    document.getElementById("builder").classList.add("hidden");
+    var view = document.getElementById("invite-view");
+    view.classList.remove("hidden");
+    document.getElementById("invite-slot").innerHTML = renderCard(d, !!eventId);
+    document.body.classList.add("view-mode");
+    var card = view.querySelector(".card");
+    var bg = getComputedStyle(card).getPropertyValue("--card-bg-page");
+    if (bg) document.body.style.background = bg;
+    if (d.title) document.title = d.title + " — You're invited!";
+    document.getElementById("make-your-own").href = location.origin + location.pathname;
+    document.getElementById("make-your-own").addEventListener("click", function (e) {
+      e.preventDefault();
+      location.hash = "";
+      location.reload();
+    });
+    if (eventId) wireRsvp(eventId);
+  }
+
+  function wireRsvp(eventId) {
+    var nameEl = document.getElementById("rsvp-name");
+    var statusEl = document.getElementById("rsvp-status");
+    var tallyEl = document.getElementById("rsvp-tally");
+
+    var countEl = document.getElementById("rsvp-count");
+    var saved = null;
+    try { saved = JSON.parse(localStorage.getItem("invitely-rsvp-" + eventId)); } catch (e) {}
+    if (saved) {
+      nameEl.value = saved.name || "";
+      if (saved.count) countEl.value = saved.count;
+      statusEl.textContent = saved.going ? "You're going 🎉 — tap again to change" : "You said you can't make it — tap to change";
+    }
+
+    function submit(going) {
+      var name = nameEl.value.trim();
+      if (!name) { nameEl.focus(); statusEl.textContent = "Please enter your name first"; return; }
+      var count = going ? Math.max(1, Math.min(20, parseInt(countEl.value, 10) || 1)) : 0;
+      statusEl.textContent = "Sending…";
+      fb.collection("events").doc(eventId).collection("rsvps").add(
+        { name: name, going: going, count: count, ts: firebase.firestore.FieldValue.serverTimestamp() })
+        .then(function () {
+          statusEl.textContent = going
+            ? (count > 1 ? "See you there — all " + count + " of you! 🎉" : "See you there! 🎉")
+            : "Thanks for letting the host know 💛";
+          try { localStorage.setItem("invitely-rsvp-" + eventId, JSON.stringify({ name: name, going: going, count: count })); } catch (e) {}
+        })
+        .catch(function () { statusEl.textContent = "Couldn't send — please try again."; });
+    }
+    document.getElementById("rsvp-yes").addEventListener("click", function () { submit(true); });
+    document.getElementById("rsvp-no").addEventListener("click", function () { submit(false); });
+
+    fb.collection("events").doc(eventId).collection("rsvps").orderBy("ts").onSnapshot(function (snap) {
+      var latest = {}; // dedupe by name — a guest's most recent answer wins
+      snap.forEach(function (docu) {
+        var r = docu.data();
+        if (r && r.name) latest[r.name.trim().toLowerCase()] = r;
+      });
+      var yes = [], no = [], headCount = 0;
+      Object.keys(latest).forEach(function (k) {
+        var r = latest[k];
+        if (r.going) {
+          var c = Math.max(1, r.count || 1); // older RSVPs have no count — treat as 1
+          headCount += c;
+          yes.push(esc(r.name) + (c > 1 ? " +" + (c - 1) : ""));
+        } else {
+          no.push(esc(r.name));
+        }
+      });
+      if (!yes.length && !no.length) { tallyEl.textContent = "Be the first to RSVP!"; return; }
+      var summary = [];
+      if (yes.length) summary.push("🎉 <strong>" + headCount + " going</strong>");
+      if (no.length) summary.push("<strong>" + no.length + "</strong> can't make it");
+      var lists = '<div class="rsvp-lists">';
+      if (yes.length) {
+        lists += '<div class="rsvp-list-block">'
+          + '<div class="rsvp-list-label">Going ✓</div>'
+          + '<div class="rsvp-names">' + yes.join("&ensp;·&ensp;") + '</div>'
+          + '</div>';
+      }
+      if (no.length) {
+        lists += '<div class="rsvp-list-block">'
+          + '<div class="rsvp-list-label">Can\'t make it</div>'
+          + '<div class="rsvp-names">' + no.map(esc).join("&ensp;·&ensp;") + '</div>'
+          + '</div>';
+      }
+      lists += '</div>';
+      tallyEl.innerHTML = summary.join("&ensp;·&ensp;") + lists;
+    });
+  }
+
+  function showBuilder() {
+    document.getElementById("invite-view").classList.add("hidden");
+    document.getElementById("builder").classList.remove("hidden");
+    initBuilder();
+  }
+
+  function showLoading() {
+    document.getElementById("builder").classList.add("hidden");
+    var view = document.getElementById("invite-view");
+    view.classList.remove("hidden");
+    document.getElementById("invite-slot").innerHTML =
+      '<div style="text-align:center;padding:60px 20px;color:var(--muted);font-size:1.05rem">Opening your invitation… ✉️</div>';
+  }
+
+  function route() {
+    var hash = location.hash.slice(1);
+    if (hash) showLoading();
+    if (hash.indexOf("e=") === 0) {
+      var id = hash.slice(2).split("&")[0];
+      var db = initFirebase();
+      if (!db) { showBuilder(); return; }
+      db.collection("events").doc(id).get()
+        .then(function (snap) {
+          if (snap.exists && snap.data() && snap.data().data) showInvite(snap.data().data, id);
+          else showBuilder();
+        })
+        .catch(function () { showBuilder(); });
+      return;
+    }
+    var data = hash ? decodeData(hash) : null;
+    if (data && typeof data === "object") {
+      showInvite(data);
+    } else {
+      showBuilder();
+    }
+  }
+
+  route();
+})();
+</script>
+</body>
+</html>
