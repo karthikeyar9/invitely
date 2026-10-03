@@ -1,7 +1,16 @@
 {
   "hosting": {
     "public": ".",
-    "ignore": ["firebase.json", "**/.*", "README.md", "node_modules/**", "firestore.rules"]
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "README.md",
+      "MONETIZATION_PLAN.md",
+      "node_modules/**",
+      "firestore.rules",
+      "imgs/A-warm-elegant-social-media-link-previe.png",
+      "imgs/social-media-link-preview.png"
+    ]
   },
   "firestore": {
     "rules": "firestore.rules"

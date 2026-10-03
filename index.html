@@ -4,7 +4,44 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Invitely — Beautiful invitations, shared as a link</title>
-<meta name="description" content="Create a beautiful invitation and share it with friends as a simple link. No signup, no app.">
+<meta name="description" content="Create a beautiful invitation and share it with friends as a simple link. No signup, no app. 12 designed themes, live RSVP tracking, and calendar links — free.">
+<link rel="canonical" href="https://invitely-app-kk.web.app/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%23c2410c'/%3E%3Ctext x='50' y='68' font-size='58' text-anchor='middle' fill='%23faf6ef'%3E%E2%9C%89%EF%B8%8F%3C/text%3E%3C/svg%3E">
+
+<!-- Open Graph / Twitter Card -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://invitely-app-kk.web.app/">
+<meta property="og:site_name" content="Invitely">
+<meta property="og:title" content="Invitely — Beautiful invitations, shared as a link">
+<meta property="og:description" content="Create a beautiful invitation and share it with friends as a simple link. No signup, no app. 12 designed themes, live RSVP tracking, and calendar links — free.">
+<meta property="og:image" content="https://invitely-app-kk.web.app/imgs/og-image.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Invitely — beautiful invitations, shared as a link">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Invitely — Beautiful invitations, shared as a link">
+<meta name="twitter:description" content="Create a beautiful invitation and share it with friends as a simple link. No signup, no app.">
+<meta name="twitter:image" content="https://invitely-app-kk.web.app/imgs/og-image.jpg">
+
+<!-- Structured data -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "Invitely",
+  "url": "https://invitely-app-kk.web.app/",
+  "description": "Create a beautiful invitation and share it with friends as a simple link. No signup, no app. 12 designed themes, live RSVP tracking, and calendar links.",
+  "image": "https://invitely-app-kk.web.app/imgs/og-image.jpg",
+  "applicationCategory": "LifestyleApplication",
+  "operatingSystem": "Any",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  }
+}
+</script>
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,500&family=Inter:wght@400;500;600;700&family=Great+Vibes&display=swap" rel="stylesheet">
@@ -121,6 +158,7 @@
     font-family: var(--title-font, "Fraunces", Georgia, serif);
     font-size: clamp(1.9rem, 5vw, 2.8rem); font-weight: 600; line-height: 1.12; margin-bottom: 14px;
   }
+  .card h2.title.title-placeholder { opacity: .4; }
   /* stationery-style double frame; transparent unless a theme sets --frame1/--frame2 */
   .card::before {
     content: ""; position: absolute; inset: 12px; border-radius: 16px;
@@ -444,7 +482,7 @@
     var html = '<div class="card theme-' + theme + (photo ? " has-photo" : "") + '"' + cardStyle + ">" + decos;
     html += '<div class="kicker">You\'re invited</div>';
     if (d.emoji) html += '<div class="emoji">' + esc(d.emoji) + "</div>";
-    html += '<h2 class="title">' + (esc(d.title) || "Your Event Title") + "</h2>";
+    html += '<h2 class="title' + (d.title ? "" : " title-placeholder") + '">' + (esc(d.title) || "Your Event Title") + "</h2>";
     if (d.host) html += '<div class="hosted">hosted by ' + esc(d.host) + "</div>";
     html += '<div class="divider"></div>';
 
