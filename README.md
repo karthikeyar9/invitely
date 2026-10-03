@@ -1,4 +1,4 @@
-# Invitely ✉️
+# RSVP Dove 🕊️
 
 A clean, modern invitation site. Fill in your event details, pick a theme,
 and get a single link you can text or email to friends.
@@ -58,7 +58,7 @@ python3 -m http.server 8642
       **Your apps** section. It will say *"There are no apps in your project"*
       — that's expected.
    3. Click the **`</>`** icon (the Web one, next to the iOS/Android icons).
-   4. Give the app any nickname (e.g. "invitely"), **leave "Firebase Hosting"
+   4. Give the app any nickname (e.g. "rsvpdove"), **leave "Firebase Hosting"
       unchecked** (we set that up separately below), and click **Register app**.
    5. You'll see a code snippet containing `const firebaseConfig = { apiKey:
       "...", authDomain: "...", ... }`. Copy just that `{ ... }` object —
@@ -85,7 +85,9 @@ firebase deploy --only hosting
 ```
 
 The deploy prints your live URL (`https://<your-project>.web.app`). Repeat
-`firebase deploy --only hosting` whenever you change a file.
+`firebase deploy --only hosting` whenever you change a file. This project's
+live site is at **https://rsvpdove.com** (a custom domain mapped to Firebase
+Hosting — see Firebase Console → Hosting → Add custom domain).
 
 Any other static host also works if you prefer:
 

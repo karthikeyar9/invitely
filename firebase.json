@@ -9,7 +9,8 @@
       "node_modules/**",
       "firestore.rules",
       "imgs/A-warm-elegant-social-media-link-previe.png",
-      "imgs/social-media-link-preview.png"
+      "imgs/social-media-link-preview.png",
+      "imgs/rsvp-dove.png"
     ]
   },
   "firestore": {
