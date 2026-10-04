@@ -2,13 +2,41 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /events/{eventId} {
+      function eventPath() { return /databases/$(database)/documents/events/$(eventId); }
+      function hostPath() { return /databases/$(database)/documents/events/$(eventId)/private/host; }
+
       // get (by ID) only — no list, so nobody can enumerate every event
       allow get, create: if true;
-      allow list, update, delete: if false;
+      allow list, delete: if false;
+      // Host edits/cancels. No accounts: the same batch must re-write private/host with the
+      // secret key from the host link, stamped with this request's time (see private/host below).
+      allow update: if getAfter(hostPath()).data.ts == request.time
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["data", "updated", "cancelled"])
+                    && request.resource.data.data is map
+                    && request.resource.data.get("cancelled", false) is bool;
+
+      // Holds the host's secret key. Never readable; writable only by someone who knows the key.
+      match /private/{docId} {
+        allow read, delete: if false;
+        // only together with the event itself, so nobody can claim an existing event
+        allow create: if docId == "host"
+                      && !exists(eventPath())
+                      && existsAfter(eventPath())
+                      && request.resource.data.keys().hasOnly(["key", "ts"])
+                      && request.resource.data.key is string
+                      && request.resource.data.key.size() >= 32;
+        // "proves" the key: value must match, and ts marks which request carried the proof
+        allow update: if docId == "host"
+                      && request.resource.data.key == resource.data.key
+                      && request.resource.data.ts == request.time
+                      && request.resource.data.keys().hasOnly(["key", "ts"]);
+      }
+
       match /rsvps/{rsvpId} {
         // reachable only via a known event ID
         allow read: if true;
-        allow create: if request.resource.data.name is string
+        allow create: if get(eventPath()).data.get("cancelled", false) != true
+                      && request.resource.data.name is string
                       && request.resource.data.name.size() > 0
                       && request.resource.data.name.size() <= 60
                       && request.resource.data.going is bool
