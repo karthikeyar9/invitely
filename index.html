@@ -475,7 +475,7 @@
     var rsvp = rsvpLinks(d);
     var cal = calendarDates(d);
 
-    var photo = (d.bg && /^data:image\//.test(d.bg)) ? d.bg : null;
+    var photo = (d.bg && /^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/]+=*$/.test(d.bg)) ? d.bg : null;
     var cardStyle = photo
       ? ' style="background-image:linear-gradient(rgba(22,18,14,.45),rgba(22,18,14,.6)),url(' + photo + ');background-size:cover;background-position:center"'
       : "";
