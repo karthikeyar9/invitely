@@ -7,3 +7,10 @@
 # Editor
 .vscode/
 *.swp
+
+# Tool/agent artifacts
+.claude-flow/
+
+# Private notes and plans (keep README)
+*.md
+!README.md
