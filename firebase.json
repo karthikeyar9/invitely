@@ -14,6 +14,13 @@
       "imgs/A-warm-elegant-social-media-link-previe.png",
       "imgs/social-media-link-preview.png",
       "imgs/rsvp-dove.png"
+    ],
+    "redirects": [
+      {
+        "source": "/evite-alternative",
+        "destination": "/how-it-works",
+        "type": 301
+      }
     ]
   },
   "firestore": {
