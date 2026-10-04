@@ -2,9 +2,11 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /events/{eventId} {
-      allow read, create: if true;
-      allow update, delete: if false;
+      // get (by ID) only — no list, so nobody can enumerate every event
+      allow get, create: if true;
+      allow list, update, delete: if false;
       match /rsvps/{rsvpId} {
+        // reachable only via a known event ID
         allow read: if true;
         allow create: if request.resource.data.name is string
                       && request.resource.data.name.size() > 0

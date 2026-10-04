@@ -7,5 +7,6 @@ window.FIREBASE_CONFIG = {
   projectId: "invitely-app-kk",
   storageBucket: "invitely-app-kk.firebasestorage.app",
   messagingSenderId: "95705821553",
-  appId: "1:95705821553:web:3478c71580742c140f86d0"
+  appId: "1:95705821553:web:3478c71580742c140f86d0",
+  measurementId: "G-LDK87DTPZ6"
 };

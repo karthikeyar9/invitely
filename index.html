@@ -7,6 +7,7 @@
 <meta name="description" content="Create a beautiful invitation and share it with friends as a simple link. No signup, no app. 12 designed themes, live RSVP tracking, and calendar links — free.">
 <link rel="canonical" href="https://rsvpdove.com/">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%23c2410c'/%3E%3Ctext x='50' y='68' font-size='58' text-anchor='middle' fill='%23faf6ef'%3E%F0%9F%95%8A%EF%B8%8F%3C/text%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="/imgs/icons/apple-touch-icon.png">
 
 <!-- Open Graph / Twitter Card -->
 <meta property="og:type" content="website">
@@ -48,6 +49,7 @@
 <!-- Firebase compat SDK — loaded as regular scripts so they always work -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics-compat.js"></script>
 <style>
   :root {
     --ink: #1f1b16;
@@ -370,6 +372,12 @@
   </div>
 </div>
 
+<footer style="max-width:960px;margin:40px auto 0;padding:24px 20px 40px;text-align:center;font-size:.85rem;color:var(--muted)">
+  <a href="/wedding-invitations" style="color:var(--muted);margin:0 10px">Wedding invitations</a>
+  <a href="/birthday-invitations" style="color:var(--muted);margin:0 10px">Birthday invitations</a>
+  <a href="/evite-alternative" style="color:var(--muted);margin:0 10px">Evite alternative</a>
+</footer>
+
 <!-- =============== INVITE VIEW =============== -->
 <div id="invite-view" class="invite-stage hidden">
   <div style="width:100%; max-width:560px;">
@@ -542,11 +550,19 @@
     try {
       if (!firebase.apps.length) firebase.initializeApp(window.FIREBASE_CONFIG);
       fb = firebase.firestore();
+      if (window.FIREBASE_CONFIG.measurementId && firebase.analytics) {
+        try { analytics = firebase.analytics(); } catch (e) { console.warn("Analytics init failed:", e); }
+      }
       return fb;
     } catch (e) {
       console.error("Firebase init failed:", e);
       return null;
     }
+  }
+
+  var analytics = null;
+  function track(name, params) {
+    if (analytics) try { analytics.logEvent(name, params || {}); } catch (e) {}
   }
 
   // ---------- State & wiring ----------
@@ -612,6 +628,16 @@
       updatePreview();
     });
 
+    // Occasion landing pages link in with ?theme=confetti to preselect a theme
+    var presetTheme = new URLSearchParams(location.search).get("theme");
+    if (presetTheme && THEME_DECOS.hasOwnProperty(presetTheme)) {
+      currentTheme = presetTheme;
+      document.querySelectorAll(".theme-chip").forEach(function (c) {
+        c.classList.toggle("active", c.dataset.theme === presetTheme);
+      });
+      updatePreview();
+    }
+
     function showShare(url, longWarn) {
       document.getElementById("share-url").textContent = url;
       document.getElementById("btn-open").href = url;
@@ -633,6 +659,7 @@
       btn.textContent = "Saving…";
       db.collection("events").add({ data: d, created: firebase.firestore.FieldValue.serverTimestamp() })
         .then(function (ref) {
+          track("invite_created");
           showShare(location.origin + location.pathname + "#e=" + ref.id);
         })
         .catch(function (err) {
@@ -696,6 +723,7 @@
       fb.collection("events").doc(eventId).collection("rsvps").add(
         { name: name, going: going, count: count, ts: firebase.firestore.FieldValue.serverTimestamp() })
         .then(function () {
+          track("rsvp_submitted", { going: going, count: count });
           statusEl.textContent = going
             ? (count > 1 ? "See you there — all " + count + " of you! 🎉" : "See you there! 🎉")
             : "Thanks for letting the host know 💛";
@@ -760,6 +788,7 @@
   }
 
   function route() {
+    initFirebase(); // also starts Analytics so every visit is counted
     var hash = location.hash.slice(1);
     if (hash) showLoading();
     if (hash.indexOf("e=") === 0) {
