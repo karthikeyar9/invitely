@@ -50,6 +50,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js" defer></script>
 <style>
   :root {
     --ink: #1f1b16;
@@ -135,6 +136,11 @@
   .share-actions { display: flex; gap: 8px; flex-wrap: wrap; }
   .share-actions .btn { padding: 9px 16px; font-size: .85rem; }
   .copied-note { font-size: .8rem; color: #15803d; font-weight: 600; margin-top: 8px; display: none; }
+  .qr-box { display: flex; gap: 14px; align-items: center; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+  .qr-box img { width: 120px; height: 120px; flex-shrink: 0; image-rendering: pixelated; background: #fff; border-radius: 6px; }
+  .qr-title { font-weight: 700; font-size: .9rem; }
+  .qr-sub { font-size: .8rem; color: var(--muted); margin: 2px 0 8px; }
+  .qr-box .btn { padding: 7px 14px; font-size: .8rem; width: auto; display: inline-block; }
 
   .preview-label { font-size: .8rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); text-align: center; margin-bottom: 14px; }
 
@@ -181,6 +187,7 @@
   }
   .card .ww-item .ww-value { font-family: "Fraunces", serif; font-size: 1.18rem; font-weight: 600; }
   .card .ww-item .ww-sub { font-size: .92rem; opacity: .75; margin-top: 2px; }
+  .card .ww-countdown { display: inline-block; margin-top: 8px; padding: 3px 12px; border-radius: 999px; font-size: .8rem; font-weight: 700; letter-spacing: .02em; background: rgba(0,0,0,.08); }
   .card .message {
     font-size: .98rem; line-height: 1.65; opacity: .85; margin-bottom: 30px; white-space: pre-wrap;
   }
@@ -203,6 +210,8 @@
   .card .rsvp-list-block { border-radius: 10px; padding: 10px 14px; text-align: left; background: rgba(0,0,0,.08); }
   .card .rsvp-list-label { font-size: .7rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; opacity: .6; margin-bottom: 4px; }
   .card .rsvp-names { font-size: .88rem; line-height: 1.55; font-weight: 500; }
+  .card .rsvp-export { display: inline-block; margin-top: 10px; font-size: .8rem; font-weight: 600; color: inherit; opacity: .65; }
+  .card .rsvp-export:hover { opacity: 1; }
   .card .btn-yes { background: var(--card-accent, var(--accent)); color: var(--card-accent-ink, #fff); box-shadow: 0 8px 22px rgba(0,0,0,.18); }
   .card .btn-no { background: transparent; color: inherit; border: 1.5px solid currentColor; opacity: .75; }
   .card .extras { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; margin-top: 22px; }
@@ -357,10 +366,21 @@
         <div class="url" id="share-url"></div>
         <div class="share-actions">
           <button class="btn btn-primary" id="btn-copy" style="width:auto">Copy link</button>
+          <a class="btn btn-ghost" id="btn-whatsapp" target="_blank" rel="noopener">WhatsApp</a>
+          <a class="btn btn-ghost" id="btn-text">Text</a>
+          <a class="btn btn-ghost" id="btn-email">Email</a>
+          <button class="btn btn-ghost hidden" id="btn-native-share" style="width:auto">More…</button>
           <a class="btn btn-ghost" id="btn-open" target="_blank" rel="noopener">Preview</a>
-          <a class="btn btn-ghost" id="btn-text">Share via text</a>
         </div>
         <div class="copied-note" id="copied-note">Copied! Paste it anywhere — text, WhatsApp, email.</div>
+        <div class="qr-box hidden" id="qr-box">
+          <img id="qr-img" alt="QR code for your invitation" width="140" height="140">
+          <div>
+            <div class="qr-title">QR code</div>
+            <div class="qr-sub">Print it on cards or a sign — guests scan to open the invite.</div>
+            <a class="btn btn-ghost" id="qr-download" download="rsvp-dove-invite-qr.png">Download QR</a>
+          </div>
+        </div>
         <div id="long-warn" style="display:none;font-size:.8rem;color:#b45309;font-weight:600;margin-top:8px">Heads up: photo invitations make very long links that may not work in texts. Enable Firebase (see README) to get short links with photos.</div>
       </div>
     </div>
@@ -435,6 +455,20 @@
     } catch (e) { return null; }
   }
 
+  function countdownText(iso) {
+    if (!iso) return "";
+    var p = iso.split("-");
+    var event = new Date(+p[0], +p[1] - 1, +p[2]);
+    if (isNaN(event)) return "";
+    var now = new Date();
+    var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    var days = Math.round((event - today) / 86400000);
+    if (days < 0) return "This event has passed";
+    if (days === 0) return "🎉 Today!";
+    if (days === 1) return "Tomorrow";
+    return "In " + days + " days";
+  }
+
   function formatDate(iso) {
     if (!iso) return "";
     var p = iso.split("-");
@@ -502,6 +536,8 @@
     if (when) {
       html += '<div class="ww-item"><div class="ww-label">When</div><div class="ww-value">' + esc(when) + "</div>";
       if (time) html += '<div class="ww-sub">starting at ' + esc(time) + "</div>";
+      var countdown = countdownText(d.date);
+      if (countdown) html += '<div class="ww-countdown">' + countdown + "</div>";
       html += "</div>";
     }
     if (d.location) {
@@ -643,13 +679,57 @@
     }
 
     function showShare(url, longWarn) {
+      var title = document.getElementById("f-title").value.trim();
+      var msg = (title ? "You're invited to " + title + "! 🎉" : "You're invited! 🎉") + " RSVP here: " + url;
       document.getElementById("share-url").textContent = url;
       document.getElementById("btn-open").href = url;
-      document.getElementById("btn-text").href = "sms:?&body=" + encodeURIComponent("You're invited! 🎉 " + url);
+      document.getElementById("btn-whatsapp").href = "https://wa.me/?text=" + encodeURIComponent(msg);
+      document.getElementById("btn-text").href = "sms:?&body=" + encodeURIComponent(msg);
+      document.getElementById("btn-email").href = "mailto:?subject=" + encodeURIComponent(title ? "You're invited: " + title : "You're invited!") +
+        "&body=" + encodeURIComponent(msg);
+      var nativeBtn = document.getElementById("btn-native-share");
+      if (navigator.share) {
+        nativeBtn.classList.remove("hidden");
+        nativeBtn.onclick = function () {
+          navigator.share({ title: title || "You're invited!", text: msg.replace(" " + url, ""), url: url }).catch(function () {});
+        };
+      }
+      showQr(url);
       document.getElementById("share-box").classList.add("visible");
       document.getElementById("copied-note").style.display = "none";
       document.getElementById("long-warn").style.display = longWarn ? "block" : "none";
       document.getElementById("share-box").scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
+    // QR as a PNG so it prints crisply; skipped for long link-only URLs that won't fit a QR code
+    function showQr(url) {
+      var box = document.getElementById("qr-box");
+      box.classList.add("hidden");
+      if (typeof qrcode === "undefined" || url.length > 1000) return;
+      try {
+        var qr = qrcode(0, "M");
+        qr.addData(url);
+        qr.make();
+        var cells = qr.getModuleCount(), scale = 10, margin = 4;
+        var size = (cells + margin * 2) * scale;
+        var c = document.createElement("canvas");
+        c.width = c.height = size;
+        var ctx = c.getContext("2d");
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, size, size);
+        ctx.fillStyle = "#000";
+        for (var r = 0; r < cells; r++) {
+          for (var col = 0; col < cells; col++) {
+            if (qr.isDark(r, col)) ctx.fillRect((col + margin) * scale, (r + margin) * scale, scale, scale);
+          }
+        }
+        var png = c.toDataURL("image/png");
+        document.getElementById("qr-img").src = png;
+        document.getElementById("qr-download").href = png;
+        box.classList.remove("hidden");
+      } catch (e) {
+        console.warn("QR generation failed:", e);
+      }
     }
 
     document.getElementById("btn-generate").addEventListener("click", function () {
@@ -744,15 +824,17 @@
         var r = docu.data();
         if (r && r.name) latest[r.name.trim().toLowerCase()] = r;
       });
-      var yes = [], no = [], headCount = 0;
+      var yes = [], no = [], headCount = 0, rows = [];
       Object.keys(latest).forEach(function (k) {
         var r = latest[k];
         if (r.going) {
           var c = Math.max(1, r.count || 1); // older RSVPs have no count — treat as 1
           headCount += c;
           yes.push(esc(r.name) + (c > 1 ? " +" + (c - 1) : ""));
+          rows.push([r.name, "Going", c]);
         } else {
           no.push(esc(r.name));
+          rows.push([r.name, "Can't make it", 0]);
         }
       });
       if (!yes.length && !no.length) { tallyEl.textContent = "Be the first to RSVP!"; return; }
@@ -769,12 +851,27 @@
       if (no.length) {
         lists += '<div class="rsvp-list-block">'
           + '<div class="rsvp-list-label">Can\'t make it</div>'
-          + '<div class="rsvp-names">' + no.map(esc).join("&ensp;·&ensp;") + '</div>'
+          + '<div class="rsvp-names">' + no.join("&ensp;·&ensp;") + '</div>'
           + '</div>';
       }
       lists += '</div>';
-      tallyEl.innerHTML = summary.join("&ensp;·&ensp;") + lists;
+      tallyEl.innerHTML = summary.join("&ensp;·&ensp;") + lists
+        + '<a class="rsvp-export" id="rsvp-export" download="guest-list.csv">Download guest list (CSV)</a>';
+      if (csvUrl) URL.revokeObjectURL(csvUrl);
+      csvUrl = URL.createObjectURL(new Blob(["﻿" + toCsv([["Name", "Response", "Party size"]].concat(rows))], { type: "text/csv" }));
+      document.getElementById("rsvp-export").href = csvUrl;
     });
+  }
+
+  var csvUrl = null;
+  function toCsv(rows) {
+    return rows.map(function (row) {
+      return row.map(function (v) {
+        var s = String(v);
+        if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; // stop spreadsheets running a name as a formula
+        return '"' + s.replace(/"/g, '""') + '"';
+      }).join(",");
+    }).join("\r\n");
   }
 
   function showBuilder() {
