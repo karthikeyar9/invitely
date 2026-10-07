@@ -6,9 +6,7 @@
     "ignore": [
       "firebase.json",
       "**/.*",
-      "README.md",
-      "MONETIZATION_PLAN.md",
-      "RSVP Dove — Backlinks & Keyword Plan.md",
+      "**/*.md",
       "node_modules/**",
       "firestore.rules",
       "imgs/A-warm-elegant-social-media-link-previe.png",
