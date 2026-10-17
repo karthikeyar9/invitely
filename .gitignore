@@ -14,3 +14,6 @@
 # Private notes and plans (keep README)
 *.md
 !README.md
+
+# Social media drafts and assets
+social/

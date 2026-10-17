@@ -110,3 +110,7 @@ footer.site-foot a { color: var(--muted); }
 .shop-card .blurb { font-size: .85rem; color: var(--muted); margin-top: 2px; }
 .disclosure { font-size: .8rem; color: var(--muted); margin-top: 12px; }
 .foot-disclosure { margin-top: 6px; font-size: .8rem; }
+.jump { margin-top: 14px; font-size: .9rem; line-height: 1.9; }
+.jump a { text-decoration: none; font-weight: 600; }
+section .more { margin-top: 12px; font-size: .9rem; }
+section .more a { text-decoration: none; font-weight: 600; }
