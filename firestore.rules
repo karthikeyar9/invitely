@@ -6,7 +6,11 @@ service cloud.firestore {
       function hostPath() { return /databases/$(database)/documents/events/$(eventId)/private/host; }
 
       // get (by ID) only — no list, so nobody can enumerate every event
-      allow get, create: if true;
+      allow get: if true;
+      // Clients may only write the event content. Fields like `premium` are set server-side
+      // (Admin SDK bypasses rules), so a client can't create an already-upgraded event.
+      allow create: if request.resource.data.keys().hasOnly(["data", "created"])
+                    && request.resource.data.data is map;
       allow list, delete: if false;
       // Host edits/cancels. No accounts: the same batch must re-write private/host with the
       // secret key from the host link, stamped with this request's time (see private/host below).
