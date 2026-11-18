@@ -1,0 +1,36 @@
+name: Uptime check
+
+# Runs every 15 minutes. If any check fails, the run fails and GitHub emails
+# the repo owner (Settings → Notifications → Actions: "Send notifications for failed workflows").
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Homepage serves the app
+        run: |
+          body=$(curl -fsS --retry 3 --retry-delay 10 --max-time 20 https://rsvpdove.com/)
+          echo "$body" | grep -q "RSVP Dove" || { echo "::error::Homepage loaded but content looks wrong"; exit 1; }
+
+      - name: www redirects / resolves
+        run: |
+          code=$(curl -sS -o /dev/null -w "%{http_code}" -L --retry 3 --retry-delay 10 --max-time 20 https://www.rsvpdove.com/ || echo 000)
+          [ "$code" = "200" ] || { echo "::error::www.rsvpdove.com returned $code"; exit 1; }
+
+      - name: Firebase config is served
+        run: curl -fsS --retry 3 --retry-delay 10 --max-time 20 https://rsvpdove.com/firebase-config.js | grep -q invitely-app-kk
+
+      - name: Firestore is reachable (not over quota)
+        run: |
+          # Reads a document that doesn't exist: 404 = healthy, 429/RESOURCE_EXHAUSTED = Spark daily quota hit.
+          # Note: a 404 read is still billed as 1 read (~96/day, far below the 50k free limit).
+          KEY=$(curl -fsS https://rsvpdove.com/firebase-config.js | grep -o 'AIza[0-9A-Za-z_-]*')
+          code=$(curl -sS -o resp.json -w "%{http_code}" --max-time 20 \
+            "https://firestore.googleapis.com/v1/projects/invitely-app-kk/databases/(default)/documents/events/__uptime_check?key=$KEY")
+          cat resp.json
+          [ "$code" = "404" ] || [ "$code" = "200" ] || { echo "::error::Firestore returned HTTP $code"; exit 1; }
